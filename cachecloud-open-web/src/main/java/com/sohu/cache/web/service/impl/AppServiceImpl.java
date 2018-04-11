@@ -139,16 +139,20 @@ public class AppServiceImpl implements AppService {
     public void updateAppAuditStatus(Long id, Long appId, Integer status, AppUser appUser) {
         appAuditDao.updateAppAudit(id, status);
         AppDesc appDesc = appDao.getAppDescById(appId);
-        
-        if (AppCheckEnum.APP_PASS.value().equals(status)) {
-            appDesc.setStatus(AppStatusEnum.STATUS_PUBLISHED.getStatus());
-            appDesc.setPassedTime(new Date());
-            appDao.update(appDesc);
-        } else if (AppCheckEnum.APP_REJECT.value().equals(status)) {
-            appDesc.setStatus(AppStatusEnum.STATUS_DENY.getStatus());
-            appDao.update(appDesc);
-        }
         AppAudit appAudit = appAuditDao.getAppAudit(id);
+        
+        // 只有应用创建才会设置状态
+        if (AppAuditType.APP_AUDIT.getValue() == appAudit.getType()) {
+            if (AppCheckEnum.APP_PASS.value().equals(status)) {
+                appDesc.setStatus(AppStatusEnum.STATUS_PUBLISHED.getStatus());
+                appDesc.setPassedTime(new Date());
+                appDao.update(appDesc);
+            } else if (AppCheckEnum.APP_REJECT.value().equals(status)) {
+                appDesc.setStatus(AppStatusEnum.STATUS_DENY.getStatus());
+                appDao.update(appDesc);
+            }
+        }
+        
         // 保存审批日志
         AppAuditLog appAuditLog = AppAuditLog.generate(appDesc, appUser, appAudit.getId(),
                 AppAuditLogTypeEnum.APP_CHECK);
@@ -174,6 +178,9 @@ public class AppServiceImpl implements AppService {
 
     @Override
     public List<InstanceInfo> getAppInstanceInfo(Long appId) {
+    		AppDesc appDesc = appDao.getAppDescById(appId);
+    		String password = appDesc.getPassword();
+    		
         List<InstanceInfo> resultList = instanceDao.getInstListByAppId(appId);
         if (resultList != null && resultList.size() > 0) {
             for (InstanceInfo instanceInfo : resultList) {
@@ -187,10 +194,10 @@ public class AppServiceImpl implements AppService {
                     }
                     String host = instanceInfo.getIp();
                     int port = instanceInfo.getPort();
-                    Boolean isMaster = redisCenter.isMaster(host, port);
+                    Boolean isMaster = redisCenter.isMaster(appId, host, port);
                     instanceInfo.setRoleDesc(isMaster);
                     if(isMaster != null && !isMaster){
-                        HostAndPort hap = redisCenter.getMaster(host, port);
+                        HostAndPort hap = redisCenter.getMaster(host, port, password);
                         if (hap != null) {
                             instanceInfo.setMasterHost(hap.getHost());
                             instanceInfo.setMasterPort(hap.getPort());

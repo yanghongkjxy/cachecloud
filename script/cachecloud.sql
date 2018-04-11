@@ -1074,3 +1074,77 @@ CREATE TABLE `instance_alert` (
   `value_type` tinyint(4) NOT NULL DEFAULT '1' COMMENT '1固定值,2差值',
   PRIMARY KEY (`config_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='实例报警阀值';
+
+alter table app_desc add column password varchar(255) default '' comment 'redis密码';
+
+CREATE TABLE `app_daily` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '自增id',
+  `app_id` bigint(20) NOT NULL COMMENT '应用id',
+  `date` date NOT NULL COMMENT '日期',
+  `create_time` datetime NOT NULL,
+  `slow_log_count` bigint(20) NOT NULL COMMENT '慢查询个数',
+  `client_exception_count` bigint(20) NOT NULL COMMENT '客户端异常个数',
+  `max_minute_client_count` bigint(20) NOT NULL COMMENT '每分钟最大客户端连接数',
+  `avg_minute_client_count` bigint(20) NOT NULL COMMENT '每分钟平均客户端连接数',
+  `max_minute_command_count` bigint(20) NOT NULL COMMENT '每分钟最大命令数',
+  `avg_minute_command_count` bigint(20) NOT NULL COMMENT '每分钟平均命令数',
+  `avg_hit_ratio` double NOT NULL COMMENT '平均命中率',
+  `min_minute_hit_ratio` double NOT NULL COMMENT '每分钟最小命中率',
+  `max_minute_hit_ratio` double NOT NULL COMMENT '每分钟最大命中率',
+  `avg_used_memory` bigint(20) NOT NULL COMMENT '最大内存使用量',
+  `max_used_memory` bigint(20) NOT NULL COMMENT '平均内存使用量',
+  `expired_keys_count` bigint(20) NOT NULL COMMENT '过期键个数',
+  `evicted_keys_count` bigint(20) NOT NULL COMMENT '剔除键个数',
+  `avg_minute_net_input_byte` double NOT NULL COMMENT '每分钟平均网络input量',
+  `max_minute_net_input_byte` double NOT NULL COMMENT '每分钟最大网络input量',
+  `avg_minute_net_output_byte` double NOT NULL COMMENT '每分钟平均网络output量',
+  `max_minute_net_output_byte` double NOT NULL COMMENT '每分钟最大网络output量',
+  `avg_object_size` bigint(20) NOT NULL COMMENT '键个数平均值',
+  `max_object_size` bigint(20) NOT NULL COMMENT '键个数最大值',
+  `big_key_times` bigint(20) NOT NULL COMMENT 'bigkey次数',
+  `big_key_info` varchar(512) COLLATE utf8_bin NOT NULL COMMENT 'bigkey详情',
+  PRIMARY KEY (`id`),
+  KEY `idx_appid_date` (`app_id`,`date`)
+) ENGINE=InnoDB AUTO_INCREMENT=933 DEFAULT CHARSET=utf8 COLLATE=utf8_bin COMMENT='app日报';
+
+DROP TABLE IF EXISTS `instance_alert_configs`;
+CREATE TABLE `instance_alert_configs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '自增id',
+  `alert_config` varchar(255) NOT NULL COMMENT '报警配置',
+  `alert_value` varchar(512) NOT NULL COMMENT '报警阀值',
+  `config_info` varchar(255) NOT NULL COMMENT '配置说明',
+  `type` tinyint(4) NOT NULL COMMENT '1:全局报警,2:实例报警',
+  `instance_id` bigint(20) NOT NULL DEFAULT 0 COMMENT '0:全局配置，其他代表实例id',
+  `status` tinyint(4) NOT NULL COMMENT '1:可用,0:不可用',
+  `compare_type` tinyint(4) NOT NULL COMMENT '比较类型：1小于,2等于,3大于,4不等于',
+  `check_cycle` tinyint(4) NOT NULL COMMENT '1:一分钟,2:五分钟,3:半小时4:一个小时,5:一天',
+  `update_time` datetime not null comment '报警配置更新时间',
+  `last_check_time` datetime not null comment '上次检查时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_index` (`type`,`instance_id`,`alert_config`,`compare_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='实例报警阀值配置';
+
+alter table standard_statistics add column cluster_info_json varchar(20480) not null default '' comment '收集的cluster info json数据';
+
+
+DROP TABLE IF EXISTS `instance_reshard_process`;
+CREATE TABLE `instance_reshard_process` (
+  id int not null auto_increment comment '自增id',
+  app_id bigint not null comment '应用id',
+  audit_id bigint not null comment '审核id',
+  source_instance_id int not null comment '源实例id',
+  target_instance_id int not null comment '目标实例id',
+  start_slot int not null comment '开始slot',
+  end_slot int not null comment '结束slot',
+  migrating_slot int not null comment '正在迁移的slot',
+  is_pipeline tinyint not null comment '是否为pipeline,0:否,1:是',
+  finish_slot_num int not null comment '已经完成迁移的slot数量',
+  status tinyint not null comment '0:运行中 1:完成 2:出错',
+  start_time datetime NOT NULL COMMENT '迁移开始时间',
+  end_time datetime NOT NULL COMMENT '迁移结束时间',
+  create_time datetime NOT NULL COMMENT '创建时间',
+  update_time datetime NOT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_audit` (`audit_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='实例Reshard进度';
+

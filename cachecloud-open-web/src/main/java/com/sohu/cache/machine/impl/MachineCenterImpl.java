@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.StringUtils;
 import org.quartz.JobKey;
 import org.quartz.Trigger;
@@ -34,10 +36,12 @@ import com.sohu.cache.async.KeyCallable;
 import com.sohu.cache.constant.InstanceStatusEnum;
 import com.sohu.cache.constant.MachineConstant;
 import com.sohu.cache.constant.MachineInfoEnum.TypeEnum;
+import com.sohu.cache.dao.AppDao;
 import com.sohu.cache.dao.InstanceDao;
 import com.sohu.cache.dao.InstanceStatsDao;
 import com.sohu.cache.dao.MachineDao;
 import com.sohu.cache.dao.MachineStatsDao;
+import com.sohu.cache.entity.AppDesc;
 import com.sohu.cache.entity.InstanceInfo;
 import com.sohu.cache.entity.InstanceStats;
 import com.sohu.cache.entity.MachineInfo;
@@ -81,7 +85,8 @@ public class MachineCenterImpl implements MachineCenter {
     private MachineDao machineDao;
 
     private RedisCenter redisCenter;
-
+    
+    private AppDao appDao;
     
     /**
      * 邮箱报警
@@ -184,7 +189,7 @@ public class MachineCenterImpl implements MachineCenter {
                 infoMap.put(MachineConstant.Traffic.getValue(), machineStats.getTraffic());
                 infoMap.put(MachineConstant.DiskUsage.getValue(), machineStats.getDiskUsageMap());
                 infoMap.put(ConstUtils.COLLECT_TIME, collectTime);
-                instanceStatsCenter.saveStandardStats(infoMap, ip, (int) hostId, ConstUtils.MACHINE);
+                instanceStatsCenter.saveStandardStats(infoMap, new HashMap<String, Object>(0), ip, (int) hostId, ConstUtils.MACHINE);
                 machineStats.setMemoryFree(Long.valueOf(machineStats.getMemoryFree()) * ConstUtils._1024 + "");
                 machineStats.setMemoryTotal(Long.valueOf(machineStats.getMemoryTotal()) * ConstUtils._1024 + "");
                 machineStats.setModifyTime(new Date());
@@ -579,10 +584,13 @@ public class MachineCenterImpl implements MachineCenter {
                     }
                     String host = instanceInfo.getIp();
                     int port = instanceInfo.getPort();
-                    Boolean isMaster = redisCenter.isMaster(host, port);
+                    long appId = instanceInfo.getAppId();
+                    AppDesc appDesc = appDao.getAppDescById(appId);
+                    String password = appDesc.getPassword();
+                    Boolean isMaster = redisCenter.isMaster(appId, host, port);
                     instanceInfo.setRoleDesc(isMaster);
                     if(isMaster != null && !isMaster){
-                        HostAndPort hap = redisCenter.getMaster(host, port);
+                        HostAndPort hap = redisCenter.getMaster(host, port, password);
                         if (hap != null) {
                             instanceInfo.setMasterHost(hap.getHost());
                             instanceInfo.setMasterPort(hap.getPort());
@@ -693,9 +701,33 @@ public class MachineCenterImpl implements MachineCenter {
         }
         return schedulerCenter.unscheduleJob(collectionTriggerKey);
 	}
+	
+	@Override
+    public Map<String, Integer> getMachineInstanceCountMap() {
+	    List<Map<String,Object>> mapList = instanceDao.getMachineInstanceCountMap();
+	    if (CollectionUtils.isEmpty(mapList)) {
+	        return Collections.emptyMap();
+	    }
+	    
+	    Map<String, Integer> resultMap = new HashMap<String, Integer>();
+	    for(Map<String,Object> map : mapList) {
+	        String ip = MapUtils.getString(map, "ip", "");
+	        if (StringUtils.isBlank(ip)) {
+	            continue;
+	        }
+	        int count = MapUtils.getIntValue(map, "count");
+	        resultMap.put(ip, count);
+	    }
+        return resultMap;
+    }
 
 	public void setAsyncService(AsyncService asyncService) {
 		this.asyncService = asyncService;
 	}
+
+	public void setAppDao(AppDao appDao) {
+		this.appDao = appDao;
+	}
+    
     
 }
